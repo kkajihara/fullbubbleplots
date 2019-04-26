@@ -1,5 +1,16 @@
 library(rsconnect)
 library(shiny)
+library(plotly)
+library(dplyr)
+
+#File inputs
+mapping <- read.csv(file = "~/Desktop/Shiny App/fullbubbleplots/Miseq02_full_run_metadata_ITS_table.csv", sep = ",")
+abundance <- read.csv(file = "~/Desktop/Shiny App/fullbubbleplots/Miseq02_abundance_ITS_table.csv", sep = ",")
+taxonomy <- read.csv(file = "~/Desktop/Shiny App/fullbubbleplots/Miseq02_taxonomy_ITS_table.csv", sep = ",")
+
+#change 'Group' column in abundance table to 'id' (to match 'id' column of metadata table)
+colnames(abundance)[colnames(abundance)=="Group"] <- "id"
+
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
@@ -13,9 +24,9 @@ ui <- fluidPage(
     # Sidebar panel for inputs ----
     sidebarPanel(
       
-      # Input: Select a taxon ----
-      selectInput(inputId = "taxon",
-                  label = "Select a taxon:",
+      # Input: Select a sample type ----
+      selectInput(inputId = "sampleType",
+                  label = "Select a sample type:",
                   choices = c("A", "B", "C"))
       
     ),
@@ -23,8 +34,10 @@ ui <- fluidPage(
     # Main panel for displaying outputs ----
     mainPanel(
       
-      # Output: Histogram ----
-      #plotOutput(outputId = "distPlot")
+      # Output: Plotly ----
+      #output$plot <- renderPlotly({
+        #plot_ly()
+      #})
       
     )
   )
@@ -34,3 +47,5 @@ server <- function(input, output) {
   
   
 }
+
+shinyApp(ui = ui,server = server)
