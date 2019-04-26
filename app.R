@@ -2,6 +2,7 @@ library(rsconnect)
 library(shiny)
 library(plotly)
 library(dplyr)
+library(janitor)
 
 #File inputs
 metadata <- read.csv(file = "~/Desktop/Shiny App/fullbubbleplots/Miseq02_full_run_metadata_ITS_table.csv", sep = ",")
@@ -52,6 +53,12 @@ nonZeroCol <- (colSums(filteredAbun, na.rm = T) != 0)
 
 #new data frame where only non-zero columns remain
 nonZeroAbun <- filteredAbun[, nonZeroCol]
+
+#adds "Total" row at bottom with colSums
+addColSums <- nonZeroAbun %>% adorn_totals("row")
+
+#filters taxonomy table to only include rows where OTUs match nonZeroAbun
+filteredTax <- taxonomy[taxonomy$OTU %in% colnames(nonZeroAbun), ]
 
 
 
