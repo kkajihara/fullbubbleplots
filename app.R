@@ -41,8 +41,17 @@ ui <- fluidPage(
   )
 )
 
-filteredMeta <- metadata[metadata[, "project"] == 'cmaiki',]
+#filters metadata table to keep rows where "project" == "cmaiki"
+filteredMeta <- metadata[metadata[, "project"] == "cmaiki",]
+
+#filters abundance table to keep rows where id from filteredMeta match
 filteredAbun <- abundance[abundance$id %in% filteredMeta$id, ]
+
+#isolates columns in filteredAbun where colSum is not 0
+nonZeroCol <- (colSums(filteredAbun, na.rm = T) != 0)
+
+#new data frame where only non-zero columns remain
+nonZeroAbun <- filteredAbun[, nonZeroCol]
 
 
 
