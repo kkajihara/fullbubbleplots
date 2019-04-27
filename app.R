@@ -50,20 +50,20 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   
-  #filters metadata table to keep rows where "project" == input
-  filteredMeta <- reactive({metadata[metadata[, "project"] == input$projectName,]})
+  #filters metadata table to keep rows where "project" == cmaiki (test)
+  filteredMeta <- metadata[metadata[, "project"] == 'cmaiki',]
   
   #filters abundance table to keep rows where id from filteredMeta match
-  filteredAbun <- reactive({abundance[abundance$id %in% filteredMeta()$id, ]})
+  filteredAbun <- abundance[abundance$id %in% filteredMeta$id, ]
   
   #isolates columns in filteredAbun where colSum is not 0
-  nonZeroCol <- reactive({(colSums(filteredAbun(), na.rm = T) != 0)})
+  nonZeroCol <- (colSums(filteredAbun, na.rm = T) != 0)
   
   #new data frame where only non-zero columns remain
-  nonZeroAbun <- reactive({filteredAbun()[, nonZeroCol()]})
+  nonZeroAbun <- filteredAbun[, nonZeroCol]
   
   #adds "Total" row at bottom with colSums
-  addColSums <- reactive({nonZeroAbun() %>% adorn_totals("row")})
+  addColSums <- nonZeroAbun %>% adorn_totals("row")
   
   #filters taxonomy table to only include rows where OTUs match nonZeroAbun
   #filteredTax <- taxonomy[taxonomy$OTU %in% colnames(nonZeroAbun), ]
@@ -72,27 +72,29 @@ server <- function(input, output) {
   #lastRow <- tail(addColSums, 1)
   
   #make id column values into row names
-  row.names(addColSums()) <- reactive({addColSums()$id})
-  addColSums()[1] <- NULL
+  row.names(addColSums) <- addColSums$id
+  addColSums[1] <- NULL
   
   #adds counts for how many samples the OTU showed up in (using table without column sums)
-  sampleCounts <- reactive({colSums(nonZeroAbun() != 0)})
+  sampleCounts <- colSums(nonZeroAbun != 0)
   
-  sampleCountsLess <- reactive({tail(sampleCounts(), -1)})
+  #remove first row
+  sampleCountsLess <- tail(sampleCounts, -1)
   
   #appends sample count row to abundance table with column sums
-  forPlotly <- reactive({rbind(addColSums(), sampleCountsLess())})
+  forPlotly <- rbind(addColSums, sampleCountsLess)
   
   #switches column names and row names for easier plotly use (using transpose)
-  plotlyTransformed <- reactive({as.data.frame(t(forPlotly()))})
+  plotlyTransformed <- as.data.frame(t(forPlotly))
   
   #creates column for OTUs for easier plotly use
-  addOTUColumn <- reactive({setDT(plotlyTransformed(), keep.rownames = "OTU")})
+  addOTUColumn <- setDT(plotlyTransformed, keep.rownames = "OTU")
   
   #rename last column to reference in plotly
-  addCountsTitle <- reactive({names(addOTUColumn())[length(names(addOTUColumn()))] <- "Counts"}) 
-  
-  plotlyReady <- reactive({addOTUColumn()})
+  addCountsTitle <- names(addOTUColumn)[length(names(addOTUColumn))] <- "Counts" 
+
+  plotlyReady <- addOTUColumn
+  View(plotlyReady)
   
   
     output$trendPlot <- renderPlotly({
