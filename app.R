@@ -3,6 +3,8 @@ library(shiny)
 library(plotly)
 library(dplyr)
 library(janitor)
+library(data.table)
+library(tidyverse)
 
 #File inputs
 metadata <- read.csv(file = "~/Desktop/Shiny App/fullbubbleplots/Miseq02_full_run_metadata_ITS_table.csv", sep = ",")
@@ -25,9 +27,9 @@ ui <- fluidPage(
     # Sidebar panel for inputs ----
     sidebarPanel(
       
-      # Input: Select a sample type ----
-      selectInput(inputId = "sampleType",
-                  label = "Select a sample type:",
+      # Input: Select a project (later sampleType) ----
+      selectInput(inputId = "projectName",
+                  label = "Select a project:",
                   choices = c("crowlab", "phykaa", "cmaiki", "mock", "control"))
       
     ),
@@ -36,37 +38,75 @@ ui <- fluidPage(
     mainPanel(
       
       # Output: Plotly ----
-      #plotlyOutput("trendPlot")
+      plotlyOutput("trendPlot")
       
     )
   )
 )
 
-#filters metadata table to keep rows where "project" == "cmaiki"
-filteredMeta <- metadata[metadata[, "project"] == "cmaiki",]
 
-#filters abundance table to keep rows where id from filteredMeta match
-filteredAbun <- abundance[abundance$id %in% filteredMeta$id, ]
-
-#isolates columns in filteredAbun where colSum is not 0
-nonZeroCol <- (colSums(filteredAbun, na.rm = T) != 0)
-
-#new data frame where only non-zero columns remain
-nonZeroAbun <- filteredAbun[, nonZeroCol]
-
-#adds "Total" row at bottom with colSums
-addColSums <- nonZeroAbun %>% adorn_totals("row")
-
-#filters taxonomy table to only include rows where OTUs match nonZeroAbun
-filteredTax <- taxonomy[taxonomy$OTU %in% colnames(nonZeroAbun), ]
 
 
 
 server <- function(input, output) {
   
-    #output$trendPlot <- renderPlotly({
-    #plot_ly()
-    #})
+  #filters metadata table to keep rows where "project" == input
+  filteredMeta <- reactive({metadata[metadata[, "project"] == input$projectName,]})
+  
+  #filters abundance table to keep rows where id from filteredMeta match
+  filteredAbun <- reactive({abundance[abundance$id %in% filteredMeta()$id, ]})
+  
+  #isolates columns in filteredAbun where colSum is not 0
+  nonZeroCol <- reactive({(colSums(filteredAbun(), na.rm = T) != 0)})
+  
+  #new data frame where only non-zero columns remain
+  nonZeroAbun <- reactive({filteredAbun()[, nonZeroCol()]})
+  
+  #adds "Total" row at bottom with colSums
+  addColSums <- reactive({nonZeroAbun() %>% adorn_totals("row")})
+  
+  #filters taxonomy table to only include rows where OTUs match nonZeroAbun
+  #filteredTax <- taxonomy[taxonomy$OTU %in% colnames(nonZeroAbun), ]
+  
+  #check that "Total" colSum row was added
+  #lastRow <- tail(addColSums, 1)
+  
+  #make id column values into row names
+  row.names(addColSums()) <- reactive({addColSums()$id})
+  addColSums()[1] <- NULL
+  
+  #adds counts for how many samples the OTU showed up in (using table without column sums)
+  sampleCounts <- reactive({colSums(nonZeroAbun() != 0)})
+  
+  sampleCountsLess <- reactive({tail(sampleCounts(), -1)})
+  
+  #appends sample count row to abundance table with column sums
+  forPlotly <- reactive({rbind(addColSums(), sampleCountsLess())})
+  
+  #switches column names and row names for easier plotly use (using transpose)
+  plotlyTransformed <- reactive({as.data.frame(t(forPlotly()))})
+  
+  #creates column for OTUs for easier plotly use
+  addOTUColumn <- reactive({setDT(plotlyTransformed(), keep.rownames = "OTU")})
+  
+  #rename last column to reference in plotly
+  addCountsTitle <- reactive({names(addOTUColumn())[length(names(addOTUColumn()))] <- "Counts"}) 
+  
+  plotlyReady <- reactive({addOTUColumn()})
+  
+  
+    output$trendPlot <- renderPlotly({
+      
+      p <- plot_ly(plotlyReady, x = ~Counts, y = ~Total, type = 'scatter', mode = 'markers', size = ~Total, color = ~OTU, colors = 'Paired',
+                   #Choosing the range of the bubbles' sizes:
+                   sizes = c(10, 50),
+                   marker = list(opacity = 0.5, sizemode = 'diameter')) %>%
+        
+        layout(title = 'Fungal Abundance',
+               xaxis = list(showgrid = FALSE),
+               yaxis = list(showgrid = FALSE),
+               showlegend = FALSE)
+    })
   
 }
 
